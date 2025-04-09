@@ -2,6 +2,7 @@
 const blogRouter = require('express').Router()
 const jwt = require('jsonwebtoken')
 const Blog = require('../models/blog')
+const blog = require('../models/blog')
 require('dotenv').config()
 
 blogRouter.get('/', async (request, response) => {
@@ -31,7 +32,7 @@ blogRouter.post('/', async (request, response) => {
       title: title,
       url: url,
       likes: likes,
-      user: user._id
+      user: user
     })
   
     const savedBlog = await blog.save()
@@ -44,12 +45,21 @@ blogRouter.post('/', async (request, response) => {
 blogRouter.delete('/:id', async (request, response) => {
   const user = request.user
   const blogToDelete = await Blog.findById(request.params.id)
-    
+  
+  if (!blogToDelete) {
+    return response.status(204).end()
+  } 
+  
   if (blogToDelete.user.toString() === user._id.toString()) {
-    await blogToDelete.deleteOne()
-    response.status(204).end()
+  
+      await blogToDelete.deleteOne()
+
+      user.blogs = user.blogs.filter(b => b.toString() !== blogToDelete._id.toString())
+      await user.save()
+      response.status(204).end()
+  
   } else {
-    response.status(401).json({ error: 'Cannot delete notes you did not create'})
+    response.status(401).json({ error: 'Cannot delete blogs you did not create'})
   }
    
 })
@@ -62,11 +72,7 @@ blogRouter.put('/:id', async (request, response) => {
     url: url,
     likes: likes
   }
-  const user = request.user
-  const blogToUpdate = await Blog.findById(request.params.id)
-
-  if (blogToUpdate.user.toString() === user._id.toString()) {
-    
+     
     await Blog.findByIdAndUpdate(request.params.id, 
       updatedBlog, 
       {
@@ -74,11 +80,8 @@ blogRouter.put('/:id', async (request, response) => {
         runValidators: true
       }
     )
-
     response.status(200).json(updatedBlog)
-  } else {
-    response.status(401).json({ error: 'Cannot update notes you did not create'})
-  }
+  
 })
 
 module.exports = blogRouter
